@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from setuptools import setup, find_packages
 
 with open("README.md", "r") as fh:
@@ -6,7 +7,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="CANdas",
-    version="0.1.0",
+    version="1.0.0",
     author="Julian Wagenschütz",
     author_email="julian@wagenschuetz.com",
     description="Manage CAN Data elegantly.",
@@ -32,9 +33,9 @@ setup(
         "docs": ["sphinx", "alabaster", "m2r"],
     },
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 5 - Production/Stable',
 
-        'Intended Audience :: Data Scientiests',
+        'Intended Audience :: Science/Research',
 
         'License :: OSI Approved :: MIT License',
 
