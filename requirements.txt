@@ -1,0 +1,10 @@
+matplotlib
+numpy
+cantools
+scipy
+python-can
+jupyter
+ipywidgets
+pandas
+SQLAlchemy
+mysqlclient

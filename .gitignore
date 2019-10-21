@@ -1,0 +1,15 @@
+*.ini
+.coverage
+.pytest_cache
+.ipynb_checkpoints/
+.pytest_cache
+*.mat
+*.blf
+__pycache__
+*.bak
+*.egg
+*.egg-info
+key.txt
+# dbc repository
+can
+public
