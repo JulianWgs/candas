@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
+import os
 from setuptools import setup, find_packages
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
+version = os.environ.get("CI_BUILD_TAG", "local")
 
 setup(
     name="CANdas",
-    version="1.0.0",
+    version=version,
     author="Julian Wagenschütz",
     author_email="julian@wagenschuetz.com",
     description="Manage CAN Data elegantly.",

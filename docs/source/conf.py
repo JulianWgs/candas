@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 #
 # Configuration file for the Sphinx documentation builder.
 #
@@ -21,9 +22,9 @@ copyright = '2019, Julian Wagenschütz'
 author = 'Julian Wagenschütz'
 
 # The short X.Y version
-version = ''
+version = os.environ.get("CI_BUILD_TAG", "local")
 # The full version, including alpha/beta/rc tags
-release = '0.1.0'
+release = os.environ.get("CI_BUILD_TAG", "local")
 
 
 # -- General configuration ---------------------------------------------------

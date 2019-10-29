@@ -1,4 +1,10 @@
+stages:
+  - test
+  - docs
+  - deploy
+
 code_quality:
+  stage: test
   image: julianwgs/codequality:latest
   script:
   # install library
@@ -33,12 +39,12 @@ code_quality:
     - "radon_mi.*"
 
 pages:
+  stage: docs
   only: 
-  - master
+  - \^\d+\.\d+(\.\d+)?$\
   image: python:3.7
   script:
   # install dependencies
-  - apt-get update && apt-get install -y libopenblas-dev gfortran
   - pip install -e .[docs]
   # make html documentation
   - cd docs/
@@ -50,3 +56,13 @@ pages:
   artifacts:
     paths:
     - public
+
+release:
+  stage: deploy
+  only:
+  - \^\d+\.\d+(\.\d+)?$\
+  image: python:3.7
+  script:
+  - pip install twine
+  - python setup.py sdist bdist_wheel
+  - twine upload dist/*

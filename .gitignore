@@ -13,3 +13,5 @@ key.txt
 # dbc repository
 can
 public
+dist
+docs/build
