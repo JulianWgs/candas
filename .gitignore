@@ -3,6 +3,7 @@
 .pytest_cache
 .ipynb_checkpoints/
 .pytest_cache
+*.swp
 *.mat
 *.blf
 __pycache__
@@ -15,3 +16,4 @@ can
 public
 dist
 docs/build
+build
