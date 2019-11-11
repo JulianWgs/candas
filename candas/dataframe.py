@@ -28,7 +28,10 @@ class CANDataLog(dict):
     Beyond that other function are implemented.
     """
 
-    def __init__(self, log_data, dbc_db, file_hash_blf, file_hash_mat, source):
+    # Attributes are defined with set_metadata function
+    # pylint: disable=W0201
+    def __init__(self, log_data, dbc_db, file_hash_blf, file_hash_mat, source,
+                 **kwargs):
         """
         Parameters
         ----------
@@ -58,6 +61,7 @@ class CANDataLog(dict):
         self.__file_hash_blf = file_hash_blf
         self.__file_hash_mat = file_hash_mat
         self.__source = source
+        self.set_metadata(kwargs)
 
     def __repr__(self):
         return self.__dbc_db.version
@@ -1168,7 +1172,7 @@ class CANDataLog(dict):
 
 
 def from_file(dbc_db, filename, names=None, always_convert=False,
-              verbose=True):
+              verbose=True, **kwargs):
     """
     Create CANDataLog object from a .blf (raw binary) or .mat (converted) file.
 
@@ -1244,7 +1248,7 @@ def from_file(dbc_db, filename, names=None, always_convert=False,
                 raise KeyError("Wrong name: ", name)
 
     return CANDataLog(ret_value, dbc_db,
-                      file_hash_blf, file_hash_mat, source="file")
+                      file_hash_blf, file_hash_mat, source="file", **kwargs)
 
 
 def from_database(dbc_db, session_id, engine, names=None):
@@ -1343,7 +1347,7 @@ def from_fake(dbc_db,
               file_hash_blf=("00000000000000000000000000000000"
                              "00000000000000000000000000000000"),
               file_hash_mat=("00000000000000000000000000000000"
-                             "00000000000000000000000000000000")):
+                             "00000000000000000000000000000000"), **kwargs):
     """
     Create a data log with propterties given in a list of dicts with key name
     arguments of create_fake_can_data function.
@@ -1379,7 +1383,7 @@ def from_fake(dbc_db,
         log_data[name] = create_fake_can_data(**signal_properties)
 
     return CANDataLog(log_data, dbc_db,
-                      file_hash_blf, file_hash_mat, source="fake")
+                      file_hash_blf, file_hash_mat, source="fake", **kwargs)
 
 
 def get_message_signal(connection, metadata, session_id):
