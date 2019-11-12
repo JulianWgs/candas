@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+Database functions and tools for the dataframe.
+"""
 from sqlalchemy import MetaData, Table, Column
 from sqlalchemy import (Float, BigInteger, Integer, Boolean,
                         String, DateTime, Date, Time)
@@ -188,7 +193,6 @@ def create_data_tables(engine, dbc_db, ignored_messages=None, verbose=False):
             Column("time", Float, nullable=False),
         ]
         for signal in message.signals:
-            # TODO: Investigate why choices is defined twice
             if signal.choices:
                 for choice in signal.choices:
                     max_len = 0

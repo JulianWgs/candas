@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 """
 Dataframe to analyze CAN data.
 """
@@ -28,7 +30,10 @@ class CANDataLog(dict):
     Beyond that other function are implemented.
     """
 
-    def __init__(self, log_data, dbc_db, file_hash_blf, file_hash_mat, source):
+    # Attributes are defined with set_metadata function
+    # pylint: disable=W0201
+    def __init__(self, log_data, dbc_db, file_hash_blf, file_hash_mat, source,
+                 **kwargs):
         """
         Parameters
         ----------
@@ -58,6 +63,7 @@ class CANDataLog(dict):
         self.__file_hash_blf = file_hash_blf
         self.__file_hash_mat = file_hash_mat
         self.__source = source
+        self.set_metadata(kwargs)
 
     def __repr__(self):
         return self.__dbc_db.version
@@ -452,7 +458,6 @@ class CANDataLog(dict):
             axis with plot data
 
         """
-        # TODO: Group together signals with line color
         # When no names are given all signal are plotted
         # This is useful when you want to method chain loading and plotting
         if names is None:
@@ -538,7 +543,7 @@ class CANDataLog(dict):
         ax.set_xlabel(get_label_from_names(names, self.__dbc_db))
         return ax
 
-    def plot_bit_signals(self, names=None, colors=["r", "g"], ax=None):
+    def plot_bit_signals(self, names=None, colors=("r", "g"), ax=None):
         """Plot signals which can only be on or off.
 
         Parameters
@@ -632,7 +637,7 @@ class CANDataLog(dict):
                     sensors_per_stack = self.voltage_sensors_per_stack
 
             if number_of_stacks is None:
-                    number_of_stacks = self.number_of_stacks
+                number_of_stacks = self.number_of_stacks
         except AttributeError:
             raise AttributeError("Please give signal_name, "
                                  "sensors_per_stack and number_of_stacks "
@@ -749,11 +754,11 @@ class CANDataLog(dict):
             axis with plot data
 
         """
-        _, x, y = get_xy_from_timeseries(self[x_signal_name],
-                                         self[y_signal_name])
+        _, x_values, y_values = get_xy_from_timeseries(self[x_signal_name],
+                                                       self[y_signal_name])
         if ax is None:
             ax = plt.gca()
-        ax.plot(x, y)
+        ax.plot(x_values, y_values)
         x_label = "{} [{}]".format(
             x_signal_name, get_label_from_names([x_signal_name], self.__dbc_db)
         )
@@ -1168,7 +1173,7 @@ class CANDataLog(dict):
 
 
 def from_file(dbc_db, filename, names=None, always_convert=False,
-              verbose=True):
+              verbose=True, **kwargs):
     """
     Create CANDataLog object from a .blf (raw binary) or .mat (converted) file.
 
@@ -1244,7 +1249,7 @@ def from_file(dbc_db, filename, names=None, always_convert=False,
                 raise KeyError("Wrong name: ", name)
 
     return CANDataLog(ret_value, dbc_db,
-                      file_hash_blf, file_hash_mat, source="file")
+                      file_hash_blf, file_hash_mat, source="file", **kwargs)
 
 
 def from_database(dbc_db, session_id, engine, names=None):
@@ -1295,7 +1300,7 @@ def from_database(dbc_db, session_id, engine, names=None):
         message_signal_names_df = message_signal_names_df[
             message_signal_names_df["signal_name"].isin(names)
         ]
-        if len(message_signal_names_df) == 0:
+        if not message_signal_names_df:
             raise ValueError("Signal names not found!")
     log_data = {}
     for table_name, signal_names in (message_signal_names_df
@@ -1309,7 +1314,6 @@ def from_database(dbc_db, session_id, engine, names=None):
         for column_name in column_names:
             columns.append(table.columns[column_name])
         # Query results
-        # TODO: Don't query NULL value
         selection = select(columns).where(
             table.columns["session_id"] == session_id)
         result = connection.execute(selection)
@@ -1333,7 +1337,6 @@ def from_database(dbc_db, session_id, engine, names=None):
     result = connection.execute(selection)
     file_hash_blf, file_hash_mat = result.fetchone()
     connection.close()
-    # TODO: Check whether dbc_db.version and version of database are the same
     return CANDataLog(log_data, dbc_db,
                       file_hash_blf, file_hash_mat, source="database")
 
@@ -1343,7 +1346,7 @@ def from_fake(dbc_db,
               file_hash_blf=("00000000000000000000000000000000"
                              "00000000000000000000000000000000"),
               file_hash_mat=("00000000000000000000000000000000"
-                             "00000000000000000000000000000000")):
+                             "00000000000000000000000000000000"), **kwargs):
     """
     Create a data log with propterties given in a list of dicts with key name
     arguments of create_fake_can_data function.
@@ -1379,7 +1382,7 @@ def from_fake(dbc_db,
         log_data[name] = create_fake_can_data(**signal_properties)
 
     return CANDataLog(log_data, dbc_db,
-                      file_hash_blf, file_hash_mat, source="fake")
+                      file_hash_blf, file_hash_mat, source="fake", **kwargs)
 
 
 def get_message_signal(connection, metadata, session_id):
@@ -1450,7 +1453,7 @@ def load_dbc(folder, verbose=True):
     for dbc_file in dbc_files:
         file_count += 1
         dbc_db.add_dbc_file(dbc_file)
-    assert file_count > 0,  "No dbc-files in '{}'!".format(folder)
+    assert file_count > 0, "No dbc-files in '{}'!".format(folder)
     if verbose:
         print("Finished loading.")
     return dbc_db
