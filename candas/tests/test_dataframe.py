@@ -31,21 +31,22 @@ class TestCANDataLog(unittest.TestCase):
         log_data = cd.from_fake(dbc_db, signals_properties,
                                 file_hash_blf, file_hash_mat)
         self.assertTrue(repr(log_data))
-        self.assertEqual(log_data.file_hash_blf,
+        self.assertEqual(log_data.metadata["file_hash_blf"],
                          file_hash_blf)
-        self.assertEqual(log_data.file_hash_mat,
+        self.assertEqual(log_data.metadata["file_hash_mat"],
                          file_hash_mat)
         self.assertEqual(log_data.dbc_db,
                          dbc_db)
-        self.assertEqual(log_data.source,
+        self.assertEqual(log_data.metadata["source"],
                          "fake")
-        self.assertRaises(ValueError, setattr, log_data, "source", "database")
         self.assertRaises(ValueError,
-                          setattr, log_data, "file_hash_blf", file_hash_blf)
+                          log_data.metadata.__setitem__, "source", "database")
         self.assertRaises(ValueError,
-                          setattr, log_data, "file_hash_mat", file_hash_mat)
+                          log_data.metadata.__setitem__,  "file_hash_blf", file_hash_blf)
         self.assertRaises(ValueError,
-                          setattr, log_data, "session_id", 1337)
+                          log_data.metadata.__setitem__, "file_hash_mat", file_hash_mat)
+        self.assertRaises(ValueError,
+                          log_data.metadata.__setitem__, "session_id", 1337)
         name = "Test"
         log_data.name = name
         self.assertEqual(log_data.name, name)
@@ -53,41 +54,40 @@ class TestCANDataLog(unittest.TestCase):
         log_data.dbc_commit_hash = dbc_commit_hash
         self.assertEqual(log_data.dbc_commit_hash, dbc_commit_hash)
         self.assertRaises(AssertionError,
-                          setattr, log_data, "dbc_commit_hash", "abcdef")
+                          log_data.metadata.__setitem__, "dbc_commit_hash", "abcdef")
         self.assertRaises(AssertionError,
-                          setattr, log_data, "dbc_commit_hash", 42)
+                          log_data.metadata.__setitem__, "dbc_commit_hash", 42)
         date = datetime.date(2018, 5, 17)
-        log_data.date = date
-        self.assertEqual(log_data.date, date)
+        log_data.metadata["date"] = date
+        self.assertEqual(log_data.metadata["date"], date)
         self.assertRaises(AssertionError,
-                          setattr, log_data, "date", "17.05.2018")
-        self.assertEqual(log_data.start_time, None)
+                          log_data.metadata.__setitem__, "date", "17.05.2018")
         start_time = datetime.time(17, 42)
-        log_data.start_time = start_time
-        self.assertEqual(log_data.start_time, start_time)
+        log_data.metadata["start_time"] = start_time
+        self.assertEqual(log_data.metadata["start_time"], start_time)
         self.assertRaises(AssertionError,
-                          setattr, log_data, "start_time", "17:42")
+                          log_data.metadata.__setitem__, "start_time", "17:42")
         description = "This is a description"
-        log_data.description = description
-        self.assertEqual(log_data.description, description)
+        log_data.metadata["description"] = description
+        self.assertEqual(log_data.metadata["description"], description)
         self.assertRaises(AssertionError,
-                          setattr, log_data, "description", 1337)
+                          log_data.metadata.__setitem__, "description", 1337)
         self.assertRaises(AssertionError,
-                          setattr, log_data, "description", "a" * 141)
+                          log_data.metadata.__setitem__, "description", "a" * 141)
         event = "FSG"
-        log_data.event = event
-        self.assertEqual(log_data.event, event)
+        log_data.metadata["event"] = event
+        self.assertEqual(log_data.metadata["event"], event)
         self.assertRaises(AssertionError,
-                          setattr, log_data, "event", 1337)
+                          log_data.metadata.__setitem__, "event", 1337)
         self.assertRaises(AssertionError,
-                          setattr, log_data, "event", "a" * 31)
+                          log_data.metadata.__setitem__, "event", "a" * 31)
         location = "Braunschweig"
-        log_data.location = location
-        self.assertEqual(log_data.location, location)
+        log_data.metadata["location"] = location
+        self.assertEqual(log_data.metadata["location"], location)
         self.assertRaises(AssertionError,
-                          setattr, log_data, "location", 1337)
+                          log_data.metadata.__setitem__, "location", 1337)
         self.assertRaises(AssertionError,
-                          setattr, log_data, "location", "a" * 31)
+                          log_data.metadata.__setitem__, "location", "a" * 31)
         signals_properties = [{"name": "AMS_Temperature_1_3",
                                "start": 3,
                                "stop": 100}]
@@ -99,12 +99,12 @@ class TestCANDataLog(unittest.TestCase):
                                "description": description,
                                "event": event,
                                "location": location})
-        self.assertEqual(log_data.name, name)
-        self.assertEqual(log_data.dbc_commit_hash, dbc_commit_hash)
-        self.assertEqual(log_data.date, date)
-        self.assertEqual(log_data.description, description)
-        self.assertEqual(log_data.event, event)
-        self.assertEqual(log_data.location, location)
+        self.assertEqual(log_data.metadata["name"], name)
+        self.assertEqual(log_data.metadata["dbc_commit_hash"], dbc_commit_hash)
+        self.assertEqual(log_data.metadata["date"], date)
+        self.assertEqual(log_data.metadata["description"], description)
+        self.assertEqual(log_data.metadata["event"], event)
+        self.assertEqual(log_data.metadata["location"], location)
 
 
 class TestLoadDBC(unittest.TestCase):

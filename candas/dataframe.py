@@ -14,12 +14,13 @@ from scipy.io import loadmat, savemat
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 import pandas as pd
+import sqlalchemy
 from sqlalchemy.sql import select
 from sqlalchemy import func
-from sqlalchemy import MetaData
 from sqlalchemy.exc import IntegrityError
 import cantools
 import can
+from . metadata import MetaData
 
 
 class CANDataLog(dict):
@@ -30,10 +31,8 @@ class CANDataLog(dict):
     Beyond that other function are implemented.
     """
 
-    # Attributes are defined with set_metadata function
-    # pylint: disable=W0201
     def __init__(self, log_data, dbc_db, file_hash_blf, file_hash_mat, source,
-                 **kwargs):
+                 metadata=None):
         """
         Parameters
         ----------
@@ -60,10 +59,13 @@ class CANDataLog(dict):
         """
         super(CANDataLog, self).__init__(log_data)
         self.__dbc_db = dbc_db
-        self.__file_hash_blf = file_hash_blf
-        self.__file_hash_mat = file_hash_mat
-        self.__source = source
-        self.set_metadata(kwargs)
+        if not metadata:
+            metadata = dict()
+        metadata["file_hash_blf"] = file_hash_blf
+        metadata["file_hash_mat"] = file_hash_mat
+        metadata["source"] = source
+        self.metadata = MetaData(metadata)
+        self.__session_id = None
 
     def __repr__(self):
         return self.__dbc_db.version
@@ -84,75 +86,6 @@ class CANDataLog(dict):
         return self.__dbc_db
 
     @property
-    def source(self):
-        """
-        Return the source of the data log.
-
-        Source can't be changed.
-
-        Returns
-        -------
-        str
-            The source from where this object was created.
-            It can be either from a file, database or from a fake data
-            generator.
-
-        """
-        return self.__source
-
-    @source.setter
-    def source(self, _):
-        raise ValueError("Source cannot be changed")
-
-    @property
-    def file_hash_blf(self):
-        """
-        File hash of the original .blf file.
-        """
-        return self.__file_hash_blf
-
-    @file_hash_blf.setter
-    def file_hash_blf(self, _):
-        """
-        Prohibits the changing of the blf file hash.
-
-        Raises
-        ------
-        ValueError
-            Always error out, if value was tried to be changed.
-
-        Returns
-        -------
-        None.
-
-        """
-        raise ValueError("File hash cannot be changed")
-
-    @property
-    def file_hash_mat(self):
-        """
-        File hash of the uploaded .mat file.
-        """
-        return self.__file_hash_mat
-
-    @file_hash_mat.setter
-    def file_hash_mat(self, _):
-        """
-        Prohibits the changing of the mat file hash.
-
-        Raises
-        ------
-        ValueError
-            Always error out, if value was tried to be changed.
-
-        Returns
-        -------
-        None.
-
-        """
-        raise ValueError("File hash cannot be changed")
-
-    @property
     def session_id(self):
         """
         Session ID in the database.
@@ -166,239 +99,6 @@ class CANDataLog(dict):
         """
         raise ValueError("Session id cannot be changed this way."
                          "Use the get_session_id function.")
-
-    @property
-    def name(self):
-        """
-        Return Name of the log.
-
-        Returns
-        -------
-        str
-            Name of the log.
-
-        """
-        return self.__name
-
-    @name.setter
-    def name(self, name):
-        """
-        Set the name of the log.
-
-        Parameters
-        ----------
-        name : str
-            Name of the data log. It should be no longer than 30 characters.
-
-        Returns
-        -------
-        None.
-
-        """
-        assert isinstance(name, str), "name must be a string"
-        assert len(name) < 30, "name must be " "less than 30 characters"
-        self.__name = name
-
-    @property
-    def dbc_commit_hash(self):
-        """
-        Return git commit hash of the dbc.
-
-        Returns
-        -------
-        str
-            Commit hash of the dbc, if its versioned wih git, which it should.
-
-        """
-        return self.__dbc_commit_hash
-
-    @dbc_commit_hash.setter
-    def dbc_commit_hash(self, dbc_commit_hash):
-        """
-        Set the commit hash of the log.
-
-        Parameters
-        ----------
-        dbc_commit_hash : str
-            Commit hash of the dbc, if its versioned wih git, which it should.
-            It should be the full commit hash not the shortened one. The full
-            commit hash has a length of 40 characters.
-
-        Returns
-        -------
-        None.
-
-        """
-        assert isinstance(dbc_commit_hash, str), ("dbc_commit_hash "
-                                                  "must be a string")
-        assert len(dbc_commit_hash) == 40, ("dbc_commit_hash "
-                                            "must be 40 characters")
-        self.__dbc_commit_hash = dbc_commit_hash
-
-    @property
-    def date(self):
-        """
-        Return date of the log.
-
-        Returns
-        -------
-        datatime.date
-            The date on which the log was recorded.
-
-        """
-        return self.__date
-
-    @date.setter
-    def date(self, date):
-        """
-        Set the date of the log.
-
-        Parameters
-        ----------
-        date : datetime.date
-            The date on which the log was recorded.
-
-        Returns
-        -------
-        None.
-
-        """
-        assert isinstance(date, datetime.date), ("date must be a "
-                                                 "date object")
-        self.__date = date
-
-    @property
-    def start_time(self):
-        """
-        Return start time of the log.
-
-        Returns
-        -------
-        datetime.time
-            Start time of the log. This parameter is optional in the class as
-            it is sometime hard to get the specific time from the log files.
-            Together with the date it marks one point in time when the session
-            took place. Both values are separated so the time value can be let
-            empty and be marked as such.
-        """
-        try:
-            return self.__start_time
-        except AttributeError:
-            return None
-
-    @start_time.setter
-    def start_time(self, start_time):
-        """
-        Set start time of the log.
-
-        Parameters
-        ----------
-        start_time : datetime.time
-            Start time of the log.
-
-        Returns
-        -------
-        None.
-
-        """
-        assert isinstance(start_time, datetime.time), (
-            "start_time must be " "a time object"
-        )
-        self.__start_time = start_time
-
-    @property
-    def description(self):
-        """
-        Return description of the log.
-
-        Returns
-        -------
-        str
-            Short description of the log.
-
-        """
-        return self.__description
-
-    @description.setter
-    def description(self, description):
-        """
-        Set the description of the log.
-
-        Parameters
-        ----------
-        description : str
-            Short description of the log. This can be observation at the track
-            or vehicle or other important to remember circumstances.
-
-        Returns
-        -------
-        None.
-
-        """
-
-        assert isinstance(description, str), "description must be a string"
-        assert len(description) < 140, ("description must be "
-                                        "less than 140 characters")
-        self.__description = description
-
-    @property
-    def event(self):
-        """
-        Return event of the log.
-
-        Returns
-        -------
-        str
-            Event of the log.
-
-        """
-
-        return self.__event
-
-    @event.setter
-    def event(self, event):
-        """
-        Set the event of the log.
-
-        Parameters
-        ----------
-        event : str
-            Event of the log. For example FSG, FSN, VDE Race or
-            Conti After Race. Names dont have to be abreviated and no
-            validation takes place.
-
-        Returns
-        -------
-        None.
-
-        """
-        assert isinstance(event, str), "event must be a string"
-        assert len(event) < 30, "event must be less than 30 characters"
-        self.__event = event
-
-    @property
-    def location(self):
-        """
-        Location of the log.
-
-        This value can be used to name the city event or testing took place.
-        Its also possible to put GPS coordinates in this field.
-
-        The location value is only allowed to be 30 charachter
-
-        Returns
-        -------
-        str
-            Location of the log.
-
-        """
-        return self.__location
-
-    @location.setter
-    def location(self, location):
-        assert isinstance(location, str), "location must be a string"
-        assert len(location) < 30, "location must be less than 30 characters"
-        self.__location = location
 
     def set_metadata(self, metadata_dict):
         """
@@ -417,7 +117,7 @@ class CANDataLog(dict):
 
         """
         for key, value in metadata_dict.items():
-            setattr(self, key, value)
+            self.metadata[key] = value
         return self
 
     def plot_line(
@@ -627,17 +327,19 @@ class CANDataLog(dict):
         try:
             if signal_type == "temperature":
                 if signal_name is None:
-                    signal_name = self.accumulator_temperature_name
+                    signal_name = self.metadata["accumulator_temperature_name"]
                 if sensors_per_stack is None:
-                    sensors_per_stack = self.temperature_sensors_per_stack
+                    sensors_per_stack = self.metadata["temperature_sensors_"
+                                                      "per_stack"]
             elif signal_type == "voltage:":
                 if signal_name is None:
-                    signal_name = self.accumulator_voltage_name
+                    signal_name = self.metadata["accumulator_voltage_name"]
                 if sensors_per_stack is None:
-                    sensors_per_stack = self.voltage_sensors_per_stack
+                    sensors_per_stack = self.metadata["voltage_sensors_"
+                                                      "per_stack"]
 
             if number_of_stacks is None:
-                number_of_stacks = self.number_of_stacks
+                number_of_stacks = self.metadata["number_of_stacks"]
         except AttributeError:
             raise AttributeError("Please give signal_name, "
                                  "sensors_per_stack and number_of_stacks "
@@ -696,13 +398,13 @@ class CANDataLog(dict):
         """
         try:
             if name is None:
-                name = self.accumulator_temperature_name
+                name = self.metadata["accumulator_temperature_name"]
             if sensors_per_stack is None:
                 sensors_per_stack = range(
-                    self.temperature_sensors_per_stack)
+                    self.metadata["temperature_sensors_per_stack"])
         except AttributeError:
-            raise AttributeError("Please give name and  sensors_per_stack"
-                                 "as parameter or set it as class attribute")
+            raise AttributeError("Please give name and  sensors_per_stack "
+                                 "as parameter or set it as metadata.")
 
         stacks = [stack]
         # return values from this function come in a regular grid already
@@ -951,10 +653,10 @@ class CANDataLog(dict):
 
         """
         connection = engine.connect()
-        metadata = MetaData(bind=connection)
+        metadata = sqlalchemy.MetaData(bind=connection)
         metadata.reflect()
         # Get a new session id and fail if the .mat filehash already exists
-        self.get_session_id(engine, self.__file_hash_mat, mode="new")
+        self.get_session_id(engine, self.metadata["file_hash_mat"], mode="new")
         self.create_session_id_entry(engine)
         for message in self.__dbc_db.messages:
             if verbose >= 1:
@@ -1046,7 +748,7 @@ class CANDataLog(dict):
         """
         print("Session ID:", self.__session_id)
         connection = engine.connect()
-        metadata = MetaData(bind=connection)
+        metadata = sqlalchemy.MetaData(bind=connection)
         metadata.reflect()
         table = metadata.tables["sessions"]
         try:
@@ -1055,17 +757,17 @@ class CANDataLog(dict):
                 [
                     {
                         "session_id": self.__session_id,
-                        "name": self.__name,
+                        "name": self.metadata["name"],
                         "dbc_version": self.__dbc_db.version,
-                        "dbc_commit_hash": self.__dbc_commit_hash,
-                        "file_hash_blf": self.__file_hash_blf,
-                        "file_hash_mat": self.__file_hash_mat,
-                        "date": self.__date,
-                        "start_time": self.start_time,
-                        "description": self.__description,
+                        "dbc_commit_hash": self.metadata["dbc_commit_hash"],
+                        "file_hash_blf": self.metadata["file_hash_blf"],
+                        "file_hash_mat": self.metadata["file_hash_mat"],
+                        "date": self.metadata["date"],
+                        "start_time": self.metadata["start_time"],
+                        "description": self.metadata["description"],
                         "upload_date_time": datetime.datetime.now(),
-                        "event": self.__event,
-                        "location": self.__location,
+                        "event": self.metadata["event"],
+                        "location": self.metadata["location"],
                     }
                 ],
             )
@@ -1110,7 +812,7 @@ class CANDataLog(dict):
 
         """
         connection = engine.connect()
-        metadata = MetaData(bind=connection)
+        metadata = sqlalchemy.MetaData(bind=connection)
         metadata.reflect()
         connection.close()
         table = metadata.tables["sessions"]
@@ -1285,7 +987,7 @@ def from_database(dbc_db, session_id, engine, names=None):
     """
     # Connect to database and get schema
     connection = engine.connect()
-    metadata = MetaData(bind=connection)
+    metadata = sqlalchemy.MetaData(bind=connection)
     metadata.reflect()
     # Get all {signal_name: message_name} combinations in database
     signal_message_dict = get_message_signal(connection, metadata, session_id)
@@ -1400,8 +1102,8 @@ def get_message_signal(connection, metadata, session_id):
         docs.sqlalchemy.org/en/13/core/connections.html
     metadata : sqlalchemy.sql.schema.MetaData
         Collection of metadata entities like Tables and Columns is stored in
-        MetaData. This is used to access the datbase. More information here
-        docs.sqlalchemy.org/en/13/core/metadata.html.
+        sqlalchemy.MetaData. This is used to access the datbase. More
+        information here docs.sqlalchemy.org/en/13/core/metadata.html.
     session_id : int
         The sessiond ID is a unique identifier for each data log (drive
         session).
