@@ -5,7 +5,7 @@ stages:
 
 code_quality:
   stage: test
-  image: julianwgs/codequality:latest
+  image: julianwgs/codequality:20191112
   script:
   # install library
   - pip install -e .
@@ -13,6 +13,9 @@ code_quality:
   - git clone https://gitlab-ci-token:${CI_BUILD_TOKEN}@gitlab.com/lionsracing/can.git
   # delete line when analysis code is removed from repository
   - rm -r can/analysis
+
+  # install test libraries
+  - pip install pylint pytest radon anybadge
 
   # run tests and show coverage, duration of each test
   - py.test --cov=candas --cov-report=term-missing --cov-branch --durations=0 -p no:warnings
