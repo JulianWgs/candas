@@ -5,7 +5,7 @@ stages:
 
 code_quality:
   stage: test
-  image: julianwgs/codequality:20191112
+  image: julianwgs/codequality:20191116
   script:
   # install library
   - pip install -e .
@@ -15,10 +15,10 @@ code_quality:
   - rm -r can/analysis
 
   # install test libraries
-  - pip install pylint pytest radon anybadge
+  - pip install pylint pytest pytest-cov radon anybadge
 
   # run tests and show coverage, duration of each test
-  - py.test --cov=candas --cov-report=term-missing --cov-branch --durations=0 -p no:warnings
+  - pytest --cov=candas --cov-report=term-missing --cov-branch --durations=0 -p no:warnings
 
   # lint code for PEP8 errors (will never fail)
   - (pylint --rcfile=pylint.conf candas || exit 0) 2>&1 | tee pylint.txt
