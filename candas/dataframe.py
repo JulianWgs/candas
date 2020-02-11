@@ -1490,8 +1490,8 @@ def create_fake_can_data(start, stop,
         if signal_noise > 0.05:
             print("Signal noise is pretty large (Over 5% of amplitude)")
 
-    step = float((stop - start)) / period
-    time = np.linspace(start, stop, step)
+    steps = int((stop - start) / period)
+    time = np.linspace(start, stop, steps)
 
     # create different signals
     if signal_type == "sin":
