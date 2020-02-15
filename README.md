@@ -22,9 +22,10 @@ Extensive documentation can be found here: https://lionsracing.gitlab.io/candas/
 
 ## Installation
 
+- You need a SQL-Driver. Please install it beforehand.
+
 ```bash
-git clone https://gitlab.com/lionsracing/candas.git
-pip install -e candas
+pip install candas
 ```
 
 ## Contributing
