@@ -617,7 +617,7 @@ class CANDataLog(dict):
                 time_max = time_max_local
 
         # set global variables
-        length = int(time_max - time_min) * frequency
+        length = int((time_max - time_min) * frequency)
         time_global = np.linspace(time_min, time_max, length)
 
         dataframe = pd.DataFrame(time_global, columns=["time"])
