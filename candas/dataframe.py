@@ -572,7 +572,8 @@ class CANDataLog(dict):
         df.sort_values("time")
         return df
 
-    def to_dataframe_sampling(self, names=None, frequency=1.0):
+    def to_dataframe_sampling(self, names=None,
+                              frequency=None, timestamps=None):
         """
         Convert signals to pandas dataframe by sampling signals.
 
@@ -595,6 +596,15 @@ class CANDataLog(dict):
             first time value of the dataframe will be the largest start
             timestamp of all input signals and the last will be the smallest
             end timestamp. The default is 1.0.
+        frequency : float, optional
+            Freqency in Hz or 1/s by which the signal should be sampled. The
+            first time value of the dataframe will be the largest start
+            timestamp of all input signals and the last will be the smallest
+            end timestamp. This can be used instead of timestamps.
+            The default is None.
+        timestamps : :obj:`list` of :obj:`str`, optional
+            Timestamps where the sampling should happen. This can be used
+            instead of frequency.
 
         Returns
         -------
@@ -605,25 +615,26 @@ class CANDataLog(dict):
         """
         if names is None:
             names = list(self.keys())
-        # get the time span of data
-        # important: smallest time span of all signals is used
-        time_min, time_max = 0, np.infty
-        for name in names:
-            time_min_local = self[name][0][0]
-            time_max_local = self[name][-1][0]
-            if time_min_local > time_min:
-                time_min = time_min_local
-            if time_max_local < time_max:
-                time_max = time_max_local
+        if timestamps is None:
+            # get the time span of data
+            # important: smallest time span of all signals is used
+            time_min, time_max = 0, np.infty
+            for name in names:
+                time_min_local = self[name][0][0]
+                time_max_local = self[name][-1][0]
+                if time_min_local > time_min:
+                    time_min = time_min_local
+                if time_max_local < time_max:
+                    time_max = time_max_local
 
-        # set global variables
-        length = int((time_max - time_min) * frequency)
-        time_global = np.linspace(time_min, time_max, length)
+            # set global variables
+            length = int((time_max - time_min) * frequency)
+            timestamps = np.linspace(time_min, time_max, length)
 
-        dataframe = pd.DataFrame(time_global, columns=["time"])
+        dataframe = pd.DataFrame(timestamps, columns=["time"])
         for name in names:
             time, values = self[name].T
-            dataframe[name] = np.interp(time_global, time, values)
+            dataframe[name] = np.interp(timestamps, time, values)
         return dataframe
 
     def to_database(self, engine, verbose=2):
