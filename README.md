@@ -15,6 +15,7 @@
 - Data can be pushed to a SQL database
 - Download logging file from SQL database instead of having all of them on disk
 - Method chaining philosophy to create powerful and minimalistic pipelines
+- Feature demo can be found [here](https://gist.github.com/JulianWgs/2fa20fabfa87d709a0b6c394eba9266c)
 
 ## Documentation
 
@@ -22,7 +23,7 @@ Extensive documentation can be found here: https://lionsracing.gitlab.io/candas/
 
 ## Installation
 
-- You need a SQL-Driver. Please install it beforehand.
+- For the database features you need a SQL-Driver. Please install it beforehand.
 
 ```bash
 pip install candas
