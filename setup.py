@@ -29,7 +29,7 @@ setup(
         # 'dev': [],
         "sql": ["SQLAlchemy", "mysqlclient"],
         'test': ['coverage'],
-        "docs": ["sphinx", "alabaster", "m2r"],
+        "docs": ["sphinx", "alabaster", "m2r2"],
     },
     classifiers=[
         'Development Status :: 5 - Production/Stable',
