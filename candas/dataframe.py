@@ -5,6 +5,7 @@ Dataframe to analyze CAN data.
 """
 
 import os
+from collections import defaultdict
 import copy
 import glob
 import datetime
@@ -848,15 +849,13 @@ def decode_data(log, dbc_db):
         second row is the value data.
 
     """
-    decoded = {}
+    decoded = defaultdict(list)
     undecoded = []
     for msg in log:
         try:
             dec = dbc_db.decode_message(msg.arbitration_id, msg.data)
             if dec:
                 for key, data in dec.items():
-                    if key not in decoded:
-                        decoded[key] = []
                     decoded[key].append([msg.timestamp, data])
         # Catch every error which can occur and save the msg
         except:
