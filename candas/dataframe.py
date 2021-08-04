@@ -13,6 +13,7 @@ import numpy as np
 from scipy.io import loadmat, savemat
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import pandas as pd
 import cantools
 import can
@@ -239,7 +240,7 @@ class CANDataLog(dict):
         ax.set_xlabel(get_label_from_names(names, self.__dbc_db))
         return ax
 
-    def plot_bit_signals(self, names=None, colors=("r", "g"), ax=None):
+    def plot_categorical(self, names=None, ax=None, color_mapping=None, legend=True):
         """Plot signals which can only be on or off.
 
         Parameters
@@ -267,21 +268,32 @@ class CANDataLog(dict):
             names = list(self.keys())
         if ax is None:
             ax = plt.gca()
+        if color_mapping is None:
+            unique_values = set()
+            for name in names:
+                unique_values.update(np.unique(self[name][:, 1]))
+            color_mapping = {value: f"C{k}" for k, value in enumerate(unique_values)}
+        assert len(color_mapping) <= 10, f"Only 10 different categories are possible, but provided {len(color_mapping)}"
         for name in names:
             time, values = self[name].T
+            # TODO: Only necessary, because the time for string signals is also string
+            time = time.astype(float)
             # Get all the indices where the signal is changing
-            switch_idx = np.argwhere(np.diff(values) != 0)
+            switch_idx = list(np.argwhere(values[:-1] != values[1:]).flatten())
             # Add zero so the first sate is not missing
-            switch_idx = np.insert(switch_idx, 0, 0)
+            switch_idx.insert(0, 0)
+            switch_idx.append(len(values) -1)
             for start_idx, end_idx in zip(switch_idx[:-1], switch_idx[1:]):
                 # plot bar from last change to current one with specific color
                 ax.barh(
                     name,
                     width=time[end_idx] - time[start_idx],
                     left=time[start_idx],
-                    color=colors[int(values[end_idx])],
+                    color=color_mapping[values[end_idx]],
                 )
             ax.set_xlabel("Time [s]")
+        if legend:
+            ax.legend(handles=[mpatches.Patch(color=color, label=value) for value, color in color_mapping.items()])
         return ax
 
     def plot_accumulator(self, time, signal_type,

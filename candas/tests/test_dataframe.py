@@ -183,17 +183,17 @@ class TestPlotHistogram(unittest.TestCase):
         self.assertTrue(log_data.plot_histogram())
 
 
-class TestPlotBitSignals(unittest.TestCase):
+class TestPlotCategorical(unittest.TestCase):
     """Test plot_bit_signals."""
     def test_values(self):
         dbc_db = cd.load_dbc(dbc_folder)
-        signals_properties = [{"name": "AMS_Voltage_1_3",
-                               "start": 2,
-                               "stop": 10,
-                               "period": 0.2}]
-        log_data = cd.from_fake(dbc_db, signals_properties)
-        self.assertTrue(log_data.plot_bit_signals(["AMS_Voltage_1_3"]))
-        self.assertTrue(log_data.plot_bit_signals())
+        log_data = cd.from_fake(dbc_db, [])
+        log_data["PCU_Status_Steering"] = np.array([
+            np.linspace(0, 10, 100), 
+            np.random.choice([0, 1], size=100, p=[0.1, 0.9])
+        ]).T
+        self.assertTrue(log_data.plot_categorical(["PCU_Status_Steering"]))
+        self.assertTrue(log_data.plot_categorical())
 
 
 class TestPlotAccumulator(unittest.TestCase):
