@@ -9,6 +9,7 @@ from collections import defaultdict
 import copy
 import glob
 import datetime
+from pathlib import Path
 import hashlib
 import numpy as np
 from scipy.io import loadmat, savemat
@@ -674,7 +675,7 @@ class CANDataLog(dict):
         return pd.DataFrame(stats_dict)
 
 
-def from_file(dbc_db, filename, names=None, always_convert=False,
+def from_file(dbc_db, path, names=None, always_convert=False,
               verbose=True, **kwargs):
     """
     Create CANDataLog object from a .blf (raw binary) or .mat (converted) file.
@@ -684,8 +685,8 @@ def from_file(dbc_db, filename, names=None, always_convert=False,
     dbc_db : cantools.db.Database
         The dbc database which was used to convert the data from a binary
         format.
-    filename : str
-        absolute or relative path of the log file without the extension.
+    path : str, path object
+        absolute or relative path of the log file with or without the extension.
     names : :obj:`list` of :obj:`str`, optional
         Names of the signals to import. If no names are given all
         available signals are imported. This is useful when memory is an issue.
@@ -707,25 +708,26 @@ def from_file(dbc_db, filename, names=None, always_convert=False,
         Class of data log.
 
     """
-    if os.path.isfile(filename + ".mat") and not always_convert:
+    path = Path(path).with_suffix("")
+    if os.path.isfile(path.with_suffix(".mat")) and not always_convert:
         if verbose:
             print("Using already converted data")
         # add timer
-        log_data = loadmat(filename + ".mat")
+        log_data = loadmat(path.with_suffix(".mat"))
     else:
-        log_data = can.BLFReader(filename + ".blf")
+        log_data = can.BLFReader(path.with_suffix(".blf"))
         if verbose:
             print(
                 "Converting data to readable format... "
                 "this might take several minutes"
             )
         log_data = decode_data(log_data, dbc_db)
-        savemat(filename + ".mat", log_data)
+        savemat(path.with_suffix(".mat"), log_data)
 
     # Hash file for the record
     hasher = hashlib.sha256()
-    if os.path.isfile(filename + ".blf"):
-        with open(filename + ".blf", "rb") as file:
+    if os.path.isfile(path.with_suffix(".blf")):
+        with open(path.with_suffix(".blf"), "rb") as file:
             buf = file.read()
             hasher.update(buf)
         file_hash_blf = hasher.hexdigest()
@@ -733,7 +735,7 @@ def from_file(dbc_db, filename, names=None, always_convert=False,
         # Give fake file hash
         file_hash_blf = ("00000000000000000000000000000000"
                          "00000000000000000000000000000000")
-    with open(filename + ".mat", "rb") as file:
+    with open(path.with_suffix(".mat"), "rb") as file:
         buf = file.read()
         hasher.update(buf)
     file_hash_mat = hasher.hexdigest()
