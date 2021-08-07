@@ -6,6 +6,7 @@ Dataframe to analyze CAN data.
 
 import os
 from collections import defaultdict
+from collections.abc import Iterable
 import copy
 import glob
 import datetime
@@ -800,14 +801,16 @@ def from_fake(dbc_db,
                       file_hash_blf, file_hash_mat, source="fake", **kwargs)
 
 
-def load_dbc(folder, verbose=True):
+def load_dbc(path, verbose=True):
     """
     Load all dbc files from specified folder add to dbc database.
 
     Parameters
     ----------
-    folder : str
-        Absolute or relative path to folder, which contains dbc files.
+    path : str
+        Absolute or relative path, which contains dbc files.
+        Glob string to match dbc files. List of paths to dbc files.
+        The extension is not being checked.
     verbose : bool, optional
         Set to False to have no readout. The default is True.
 
@@ -817,17 +820,24 @@ def load_dbc(folder, verbose=True):
         dbc database to convert the data from binary format.
 
     """
+    if isinstance(path, str):
+        if Path(path).is_dir():
+            path = os.path.join(path, "*.dbc")
+        dbc_paths = glob.glob(path)
+        assert len(dbc_paths) > 0, f"'{path}' did not match any file"
+    elif isinstance(path, Iterable):
+        dbc_paths = path
+    # Could be path object
+    else:
+        dbc_paths = [path]
+    assert len(dbc_paths) > 0, f"No dbc-files path '{path}'!"
     dbc_db = cantools.db.Database(
         messages=None, nodes=None, buses=None, version=None
     )
     if verbose:
-        print("Loading dbc...")
-    dbc_files = glob.iglob(folder + "/*.dbc")
-    file_count = 0
-    for dbc_file in dbc_files:
-        file_count += 1
-        dbc_db.add_dbc_file(dbc_file)
-    assert file_count > 0, "No dbc-files in '{}'!".format(folder)
+        print(f"Loading files: {dbc_paths}")
+    for dbc_path in dbc_paths:
+        dbc_db.add_dbc_file(dbc_path)
     if verbose:
         print("Finished loading.")
     return dbc_db
