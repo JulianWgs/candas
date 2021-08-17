@@ -9,6 +9,8 @@ from collections import defaultdict
 from collections.abc import Iterable
 import copy
 import glob
+from multiprocessing import Pool
+from concurrent.futures import ProcessPoolExecutor
 import datetime
 from pathlib import Path
 import hashlib
@@ -843,6 +845,14 @@ def load_dbc(path, verbose=True):
     return dbc_db
 
 
+def decode(dbc_db, message):
+    try:
+        arbitration_id, timestamp, data = message
+        return arbitration_id, dbc_db.decode_message(arbitration_id, data), timestamp
+    except:
+        return arbitration_id, None, None
+
+
 def decode_data(log, dbc_db):
     """
     Decode byte-object to readable log file.
@@ -861,22 +871,25 @@ def decode_data(log, dbc_db):
         second row is the value data.
 
     """
-    decoded = defaultdict(list)
-    undecoded = []
-    for msg in log:
-        try:
-            dec = dbc_db.decode_message(msg.arbitration_id, msg.data)
-            if dec:
-                for key, data in dec.items():
-                    decoded[key].append([msg.timestamp, data])
-        # Catch every error which can occur and save the msg
-        except:
-            undecoded.append(msg)
-
-    error_ids = set(map(lambda m: m.arbitration_id, undecoded))
+    messages = [(msg.arbitration_id, msg.timestamp, tuple(msg.data)) for msg in log]
+    messages_decoded =  [decode(dbc_db, message) for message in messages]
+    messages_grouped = defaultdict(list)
+    error_ids = set()
+    for arbitration_id, data, timestamp in messages_decoded:
+        if data:
+            name = dbc_db.get_message_by_frame_id(arbitration_id).name
+            messages_grouped[name].append({**{"timestamp": timestamp}, **data})
+        else:
+            error_ids.add(arbitration_id)
+    dfs = dict()
+    for name in messages_grouped.keys():
+        dfs[name] = pd.DataFrame(messages_grouped[name]).set_index("timestamp")
+    decoded = dict()
+    for name, df in dfs.items():
+        for col in df.columns:
+            decoded[col] = np.array([df.index, df[col]]).T
     if error_ids:
         print("The following IDs caused errors: " + str(error_ids))
-
     return decoded
 
 
