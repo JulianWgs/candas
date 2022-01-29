@@ -21,15 +21,21 @@ class TestCANDataLog(unittest.TestCase):
     def test_properties(self):
         """Test setting and getting of all properties"""
         dbc_db = cd.load_dbc(dbc_folder)
-        signals_properties = [{"name": "AMS_Voltage_1_3",
-                               "start": 2,
-                               "stop": 200}]
+        signals_properties = [{
+            "name": "AMS_Voltage_1_3",
+            "start": 2,
+            "period": 0.1,
+            "stop": 200,
+            "signals": [{
+                "kind": "float",
+                "name": "AMS_CellVoltage11",
+            }]
+        }]
         file_hash_blf = ("11111111111111111111111111111111"
                          "11111111111111111111111111111111")
         file_hash_mat = ("22222222222222222222222222222222"
                          "22222222222222222222222222222222")
-        log_data = cd.from_fake(dbc_db, signals_properties,
-                                file_hash_blf, file_hash_mat)
+        log_data = cd.from_fake(dbc_db, signals_properties)
         self.assertTrue(repr(log_data))
         self.assertEqual(log_data.dbc_db,
                          dbc_db)
@@ -82,11 +88,17 @@ class TestCANDataLog(unittest.TestCase):
                           log_data.metadata.__setitem__, "location", 1337)
         self.assertRaises(AssertionError,
                           log_data.metadata.__setitem__, "location", "a" * 31)
-        signals_properties = [{"name": "AMS_Temperature_1_3",
-                               "start": 3,
-                               "stop": 100}]
-        log_data = cd.from_fake(dbc_db, signals_properties,
-                                file_hash_blf, file_hash_mat)
+        signals_properties = [{
+            "name": "AMS_CellTemperature1",
+            "start": 3,
+            "period": 0.1,
+            "stop": 100,
+            "signals": [{
+                "kind": "float",
+                "name": "AMS_Temperature_1_3",
+            }]
+        }]
+        log_data = cd.from_fake(dbc_db, signals_properties)
         log_data.set_metadata({"name": name,
                                "dbc_commit_hash": dbc_commit_hash,
                                "date": date,
@@ -136,30 +148,71 @@ class TestPlotData(unittest.TestCase):
     def test_values(self):
         """Test for different input values"""
         dbc_db = cd.load_dbc(dbc_folder)
-        signals_properties = [{"name": "AMS_Voltage_1_3",
-                               "start": 2,
-                               "stop": 200}]
+        signals_properties = [{
+            "name": "AMS_CellVoltage11",
+            "start": 2,
+            "period": 0.1,
+            "stop": 200,
+            "signals": [{
+                "name": "AMS_Voltage_1_3",
+                "kind": "float",
+            }]
+        }]
         log_data = cd.from_fake(dbc_db, signals_properties)
         self.assertTrue(log_data.plot_line(["AMS_Voltage_1_3"]))
         self.assertTrue(log_data.plot_line())
-        signals_properties = [{"name": "AMS_Voltage_1_3",
-                               "start": 2,
-                               "stop": 200},
-                              {"name": "AMS_Temperature_1_3",
-                               "start": 3,
-                               "stop": 100}]
+        signals_properties = [
+            {
+                "name": "AMS_CellVoltage11",
+                "start": 2,
+                "period": 0.1,
+                "stop": 200,
+                "signals": [{
+                    "name": "AMS_Voltage_1_3",
+                "kind": "float",
+                }]
+            }, {
+                "name": "AMS_CellTemperature1",
+                "start": 3,
+                "period": 0.1,
+                "stop": 100,
+                "signals": [{
+                    "name": "AMS_Temperature_1_3",
+                    "kind": "float",
+                }]
+            }]
         # Test twinx
         log_data = cd.from_fake(dbc_db, signals_properties)
         self.assertTrue(log_data.plot_line())
-        signals_properties = [{"name": "AMS_Voltage_1_3",
-                               "start": 2,
-                               "stop": 200},
-                              {"name": "AMS_Temperature_1_3",
-                               "start": 3,
-                               "stop": 100},
-                              {"name": "PCU_BrakeTravel",
-                               "start": 2.5,
-                               "stop": 105}]
+        signals_properties = [
+            {
+                "name": "AMS_CellVoltage11",
+                "start": 2,
+                "period": 0.1,
+                "stop": 200,
+                "signals": [{
+                    "name": "AMS_Voltage_1_3",
+                "kind": "float",
+                }]
+            }, {
+                "name": "AMS_CellTemperature1",
+                "start": 3,
+                "period": 0.1,
+                "stop": 100,
+                "signals": [{
+                    "name": "AMS_Temperature_1_3",
+                    "kind": "float",
+                }]
+            }, { 
+                "name": "PCU_ThrottleBrake",
+                "start": 2.5,
+                "period": 0.1,
+                "stop": 105,
+                "signals": [{
+                    "name": "PCU_BrakeTravel",
+                    "kind": "float",
+                }]
+            }]
         # Test twinx with two axis on one side
         log_data = cd.from_fake(dbc_db, signals_properties)
         self.assertTrue(log_data.plot_line())
@@ -169,9 +222,16 @@ class TestPlotHistogram(unittest.TestCase):
     """Test plot_histogram."""
     def test_values(self):
         dbc_db = cd.load_dbc(dbc_folder)
-        signals_properties = [{"name": "AMS_Voltage_1_3",
-                               "start": 2,
-                               "stop": 200}]
+        signals_properties = [{
+            "name": "AMS_CellVoltage11",
+            "start": 2,
+            "stop": 200,
+            "period": 0.1,
+            "signals": [{
+                "name": "AMS_Voltage_1_3",
+                 "kind": "float",
+            }]
+        }]
         log_data = cd.from_fake(dbc_db, signals_properties)
         self.assertTrue(log_data.plot_histogram(["AMS_Voltage_1_3"]))
         self.assertTrue(log_data.plot_histogram())
@@ -181,11 +241,17 @@ class TestPlotCategorical(unittest.TestCase):
     """Test plot_bit_signals."""
     def test_values(self):
         dbc_db = cd.load_dbc(dbc_folder)
-        log_data = cd.from_fake(dbc_db, [])
-        log_data["PCU_Status_Steering"] = np.array([
-            np.linspace(0, 10, 100), 
-            np.random.choice([0, 1], size=100, p=[0.1, 0.9])
-        ]).T
+        signal_properties = [{
+            "start": 0.0,
+            "stop": 5.0,
+            "period": 0.1,
+            "name": "PCU_Status",
+            "signals": [{
+                "name": "PCU_Status_Steering",
+                "kind": "categorical",
+            }],
+        }]
+        log_data = cd.from_fake(dbc_db, signal_properties)
         self.assertTrue(log_data.plot_categorical(["PCU_Status_Steering"]))
         self.assertTrue(log_data.plot_categorical())
 
@@ -194,13 +260,20 @@ class TestPlotAccumulator(unittest.TestCase):
     """Test plot_accumulator."""
     def test_values(self):
         dbc_db = cd.load_dbc(dbc_folder)
-        signals_properties = []
+        signals_properties = list()
         for x in range(9):
+            signals_properties.append({
+                "name": "AMS_CellTemperature{}".format(x+1),
+                "start": 2,
+                "stop": 200,
+                "period": 0.1,
+                "signals": [],
+            })
             for y in range(15):
-                signals_properties.append(
-                    {"name": "AMS_Temperature_{}_{}".format(x+1, y+1),
-                     "start": 2,
-                     "stop": 200})
+                signals_properties[-1]["signals"].append({
+                    "name": "AMS_Temperature_{}_{}".format(x+1, y+1),
+                    "kind": "float",
+                })
         log_data = (cd
                     .from_fake(dbc_db, signals_properties)
                     .set_metadata({
@@ -219,13 +292,20 @@ class TestPlotStackTemps(unittest.TestCase):
         """Test for different input values"""
         dbc_db = cd.load_dbc(dbc_folder)
         stacks = [3, 6]
-        signals_properties = []
-        for k in range(8):
-            for stack in stacks:
-                signals_properties.append(
-                    {"name": "AMS_Temperature_{}_{}".format(stack+1, k+1),
-                        "start": 2,
-                        "stop": 200})
+        signals_properties = list()
+        for stack in stacks:
+            signals_properties.append({
+                "name": "AMS_CellTemperature{}".format(stack+1),
+                "start": 2,
+                "stop": 200,
+                "period": 0.1,
+                "signals": [],
+            })
+            for k in range(8):
+                signals_properties[-1]["signals"].append({
+                    "name": "AMS_Temperature_{}_{}".format(stack+1, k+1),
+                    "kind": "float",
+                })
         log_data = (cd.
                     from_fake(dbc_db, signals_properties)
                     .set_metadata({
@@ -241,25 +321,36 @@ class TestPlotXY(unittest.TestCase):
     def test_values(self):
         """Test for different input values"""
         dbc_db = cd.load_dbc(dbc_folder)
-        signals_properties = [{"name": "AMS_Voltage_1_3",
-                               "start": 2,
-                               "stop": 10,
-                               "period": 0.2},
-                              {"name": "AMS_Temperature_1_5",
-                               "start": 1,
-                               "stop": 11,
-                               "period": 0.3}]
+        signals_properties = [{
+            "name": "AMS_CellVoltage11",
+            "start": 2,
+            "stop": 10,
+            "period": 0.2,
+            "signals": [{
+                "name": "AMS_Voltage_1_3",
+                "kind": "float",
+            }] 
+        }, {
+            "name": "AMS_CellTemperature1",
+            "start": 1,
+            "stop": 11,
+            "period": 0.3,
+            "signals": [{
+                "name": "AMS_Temperature_1_5",
+                "kind": "float",
+            }] 
+        }]
         log_data = cd.from_fake(dbc_db, signals_properties)
-        self.assertTrue(log_data.plot_xy(signals_properties[0]["name"],
-                                         signals_properties[1]["name"]))
+        self.assertTrue(log_data.plot_xy(signals_properties[0]["signals"][0]["name"],
+                                         signals_properties[1]["signals"][0]["name"]))
 
 
 class TestGetXYFromTimeseries(unittest.TestCase):
     """Test get_xy_from_timeseries"""
     def test_values(self):
         """Test for different input values"""
-        x_input = np.dstack((np.linspace(5, 10, 100), np.linspace(0, 5, 100)))
-        y_input = np.dstack((np.linspace(5, 10, 100), np.linspace(0, 2, 100)))
+        x_input = pd.Series(index=np.linspace(5, 10, 100), data=np.linspace(0, 5, 100))
+        y_input = pd.Series(index=np.linspace(5, 10, 100), data=np.linspace(0, 2, 100))
         time, x_ret, y_ret = get_xy_from_timeseries(x_input, y_input)
         self.assertSequenceEqual(tuple(x_ret), tuple(np.linspace(0, 5, 100)))
         self.assertSequenceEqual(tuple(y_ret), tuple(np.linspace(0, 2, 100)))
@@ -280,24 +371,35 @@ class TestToDataframe(unittest.TestCase):
     def test_values(self):
         """Test for different input values"""
         dbc_db = cd.load_dbc(dbc_folder)
-        signals_properties = [{"name": "AMS_Voltage_1_3",
-                               "start": 2,
-                               "stop": 10,
-                               "period": 0.2},
-                              {"name": "AMS_Temperature_1_5",
-                               "start": 1,
-                               "stop": 11,
-                               "period": 0.3}]
+        signals_properties = [{
+            "name": "AMS_CellVoltage11",
+            "start": 2,
+            "stop": 10,
+            "period": 0.2,
+            "signals": [{
+                "name": "AMS_Voltage_1_3",
+                "kind": "float",
+            }] 
+        }, {
+            "name": "AMS_CellTemperature1",
+            "start": 1,
+            "stop": 11,
+            "period": 0.3,
+            "signals": [{
+                "name": "AMS_Temperature_1_5",
+                "kind": "float",
+            }] 
+        }]
         log_data = cd.from_fake(dbc_db, signals_properties)
         # assertIsInstace does not seam to work
         self.assertEqual(type(pd.DataFrame()),
                          type(log_data.to_dataframe(
-                             [signals_properties[0]["name"],
-                              signals_properties[1]["name"]])))
+                             [signals_properties[0]["signals"][0]["name"],
+                              signals_properties[1]["signals"][0]["name"]])))
         self.assertEqual(type(pd.DataFrame()),
                          type(log_data.to_dataframe(
-                             [signals_properties[0]["name"],
-                              signals_properties[1]["name"]],
+                             [signals_properties[0]["signals"][0]["name"],
+                              signals_properties[1]["signals"][0]["name"]],
                              mode="sampling",
                              frequency=2)))
         self.assertRaises(ValueError, log_data.to_dataframe,

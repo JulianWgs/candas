@@ -14,6 +14,7 @@ from concurrent.futures import ProcessPoolExecutor
 import datetime
 from pathlib import Path
 import hashlib
+from pyexpat.errors import messages
 import numpy as np
 from scipy.io import loadmat, savemat
 from scipy.interpolate import interp1d
@@ -22,10 +23,11 @@ import matplotlib.patches as mpatches
 import pandas as pd
 import cantools
 import can
+from pyarrow import ArrowInvalid
 from . metadata import MetaData
 
 
-class CANDataLog(dict):
+class CANDataLog():
     """
 
     This works like a dict from the outside. All signals can be accessed using
@@ -33,7 +35,7 @@ class CANDataLog(dict):
     Beyond that other function are implemented.
     """
 
-    def __init__(self, log_data, dbc_db, metadata=None):
+    def __init__(self, log_data, dbc_db, unique_signal_names=True, metadata=None):
         """
         Parameters
         ----------
@@ -49,16 +51,43 @@ class CANDataLog(dict):
         None.
 
         """
-        super(CANDataLog, self).__init__(log_data)
+        self._log_data = log_data
         self.__dbc_db = dbc_db
         if not metadata:
             metadata = dict()
         self.metadata = MetaData(metadata)
         self.__session_id = None
 
+        if unique_signal_names:
+            signal_message_mapping = dict()
+            for message in dbc_db.messages:
+                for signal in message.signals:
+                    # Check that signal names are unique
+                    # assert signal.name not in signal_message_mapping.keys(), signal.name
+                    signal_message_mapping[signal.name] = message.name
+        else:
+            signal_message_mapping = None
+        self.signal_message_mapping = signal_message_mapping
+
+        # TODO: Only works with unique signal names -> Change!
+        # INFO:
+        # >   self.signals = sum([list(df.columns) for df in self._log_data.values()], start=[])
+        # E   AttributeError: 'bytes' object has no attribute 'columns'
+        self.signals = sum([list(df.columns) for df in self._log_data.values() if isinstance(df, pd.DataFrame)], start=[])
+
+    def __getitem__(self, key):
+        if isinstance(key, tuple) and len(key) == 2:
+            message, signal = key
+            if isinstance(message, slice): 
+                assert self.signal_message_mapping is not None, "Signal names must be unique if ':' is passed as message name"
+                message = self.signal_message_mapping[signal]
+            return self._log_data[message][signal]
+        else:
+            return self._log_data[key]
+
     def __repr__(self):
         return self.__dbc_db.version
-
+    
     @property
     def dbc_db(self):
         """
@@ -150,13 +179,13 @@ class CANDataLog(dict):
         # When no names are given all signal are plotted
         # This is useful when you want to method chain loading and plotting
         if names is None:
-            names = list(self.keys())
+            names = list(self.signals)
 
         # find largest time in log_name with key names
         if end == 0.0:
             for name in names:
-                if end < self[name][-1][0]:
-                    end = self[name][-1][0]
+                if end < self[:, name].index[-1]:
+                    end = self[:, name].index[-1]
 
         grouped_names = group_names(names)
 
@@ -171,7 +200,7 @@ class CANDataLog(dict):
             # iterate through names of signals and plot them from log_data
             for name in names_in_group:
                 x_data, y_data, start_idx, end_idx = get_data_for_plotting(
-                    self[name], start, end
+                    self[:, name], start, end
                 )
                 axes[idx].plot(
                     x_data[start_idx:end_idx:step],
@@ -218,11 +247,11 @@ class CANDataLog(dict):
         # When no names are given all signal are plotted
         # This is useful when you want to method chain loading and plotting
         if names is None:
-            names = list(self.keys())
+            names = list(self.signals)
         histogram_values = []
         # iterating over all signal and appending values to list
         for name in names:
-            _, values = self[name].T
+            values = self[:, name].values
             histogram_values.append(values)
         if ax is None:
             ax = plt.gca()
@@ -257,17 +286,17 @@ class CANDataLog(dict):
         # When no names are given all signal are plotted
         # This is useful when you want to method chain loading and plotting
         if names is None:
-            names = list(self.keys())
+            names = list(self.signals)
         if ax is None:
             ax = plt.gca()
         if color_mapping is None:
             unique_values = set()
             for name in names:
-                unique_values.update(np.unique(self[name][:, 1]))
+                unique_values.update(self[:, name].unique())
             color_mapping = {value: f"C{k}" for k, value in enumerate(unique_values)}
         assert len(color_mapping) <= 10, f"Only 10 different categories are possible, but provided {len(color_mapping)}"
         for name in names:
-            time, values = self[name].T
+            time, values = self[:, name].index, self[:, name].values
             # TODO: Only necessary, because the time for string signals is also string
             time = time.astype(float)
             # Get all the indices where the signal is changing
@@ -456,8 +485,8 @@ class CANDataLog(dict):
             axis with plot data
 
         """
-        _, x_values, y_values = get_xy_from_timeseries(self[x_signal_name],
-                                                       self[y_signal_name])
+        _, x_values, y_values = get_xy_from_timeseries(self[:, x_signal_name],
+                                                       self[:, y_signal_name])
         if ax is None:
             ax = plt.gca()
         ax.plot(x_values, y_values)
@@ -547,14 +576,14 @@ class CANDataLog(dict):
 
         """
         if names is None:
-            names = list(self.keys())
+            names = list(self.signals)
         df = pd.DataFrame()
         for name in names:
             try:
                 # Create a new DataFrame which will be concatenated to
                 # the other DataFrame. Before that this DataFrame will be
                 # prepared.
-                df_concat = pd.DataFrame(self[name], columns=["time", name])
+                df_concat = self[:, name].reset_index()
                 # Make sure time values are floats. Sometime there can be
                 # Strings if values are also strings
                 df_concat["time"] = df_concat["time"].astype(float)
@@ -614,14 +643,14 @@ class CANDataLog(dict):
 
         """
         if names is None:
-            names = list(self.keys())
+            names = list(self.signals)
         if timestamps is None:
             # get the time span of data
             # important: smallest time span of all signals is used
             time_min, time_max = 0, np.infty
             for name in names:
-                time_min_local = self[name][0][0]
-                time_max_local = self[name][-1][0]
+                time_min_local = self[:, name].index[0]
+                time_max_local = self[:, name].index[-1]
                 if time_min_local > time_min:
                     time_min = time_min_local
                 if time_max_local < time_max:
@@ -633,7 +662,7 @@ class CANDataLog(dict):
 
         dataframe = pd.DataFrame(timestamps, columns=["time"])
         for name in names:
-            time, values = self[name].T
+            time, values = self[:, name].index, self[:, name].values
             dataframe[name] = np.interp(timestamps, time, values)
         return dataframe
 
@@ -712,12 +741,18 @@ def from_file(dbc_db, path, names=None, always_convert=False,
                 "this might take several minutes"
             )
         log_data = decode_data(log_data, dbc_db)
-        savemat(path.with_suffix(".mat"), log_data)
+        os.mkdir(path)
+        for message_name, df in log_data.items():
+            try:
+                df.to_parquet(path / (message_name + ".parquet"))
+            except ArrowInvalid:
+                print(message_name)
 
     # return full data log
     if names is None:
         ret_value = log_data
     # return only given names
+    # TODO: Does not work
     else:
         ret_value = {}
         for name in names:
@@ -729,7 +764,7 @@ def from_file(dbc_db, path, names=None, always_convert=False,
     return CANDataLog(ret_value, dbc_db, **kwargs)
 
 
-def from_fake(dbc_db, signals_properties, **kwargs):
+def from_fake(dbc_db, messages_properties, **kwargs):
     """
     Create a data log with propterties given in a list of dicts with key name
     arguments of create_fake_can_data function.
@@ -739,8 +774,8 @@ def from_fake(dbc_db, signals_properties, **kwargs):
     dbc_db : cantools.db.Database
         The dbc database which was used to convert the data from a binary
         format.
-    signals_properties : :obj:`dict`
-        Key-Value pairs of the properties. See create_fake_can_data for more
+    messages_properties : :obj:`dict`
+        Key-Value pairs of the properties. Signal properties must be stored under "signals" key. See create_fake_can_data for more
         information.
 
     Returns
@@ -750,11 +785,16 @@ def from_fake(dbc_db, signals_properties, **kwargs):
 
     """
     log_data = {}
-    # To prevent that .pop remove entry from original dict
-    signals_properties = copy.deepcopy(signals_properties)
-    for signal_properties in signals_properties:
-        name = signal_properties.pop("name")
-        log_data[name] = create_fake_can_data(**signal_properties)
+    messages_properties = copy.deepcopy(messages_properties)
+    for message_properties in messages_properties:
+        message_name = message_properties.pop("name")
+        signals_properties = message_properties.pop("signals")
+        time = create_fake_can_time(**message_properties)
+        data = dict()
+        for signal_properties in signals_properties:
+            signal_name = signal_properties.pop("name")
+            data[signal_name] = create_fake_can_data(time, **signal_properties)
+        log_data[message_name] = pd.DataFrame(index=time, data=data)
 
     return CANDataLog(log_data, dbc_db, **kwargs)
 
@@ -840,13 +880,9 @@ def decode_data(log, dbc_db):
     dfs = dict()
     for name in messages_grouped.keys():
         dfs[name] = pd.DataFrame(messages_grouped[name]).set_index("timestamp")
-    decoded = dict()
-    for name, df in dfs.items():
-        for col in df.columns:
-            decoded[col] = np.array([df.index, df[col]]).T
     if error_ids:
         print("The following IDs caused errors: " + str(error_ids))
-    return decoded
+    return dfs
 
 
 def get_xy_from_timeseries(x_data, y_data):
@@ -855,12 +891,8 @@ def get_xy_from_timeseries(x_data, y_data):
 
     Parameters
     ----------
-    x_data : numpy.ndarray
-        Numpy arrays, where the first row is the time data and the
-        second row is the value data.
-    y_data : numpy.ndarray
-        Numpy arrays, where the first row is the time data and the
-        second row is the value data.
+    x_data : pd.Series
+    y_data : pd.Series
 
     Returns
     -------
@@ -869,8 +901,8 @@ def get_xy_from_timeseries(x_data, y_data):
         and one interpolated value signal.
 
     """
-    t_x, data_x = x_data.T
-    t_y, data_y = y_data.T
+    t_x, data_x = x_data.index, x_data.values
+    t_y, data_y = y_data.index, y_data.values
 
     # data_y(t_x)
     if len(t_x) < len(t_y):
@@ -930,8 +962,8 @@ def convert_sensor_data_to_grid(log_data, name, stacks, sensors, time):
                 idx_sensor = len(sensors) - sensor - 1
             # This can be vectorized, but speed is not important right now
             sensor_value = interp1d(
-                log_data[key][:, 0],
-                log_data[key][:, 1],
+                log_data[:, key].index,
+                log_data[:, key].values,
                 fill_value="extrapolate")(time)
             sensor_values[idx_stack, idx_sensor] = sensor_value
 
@@ -1080,25 +1112,16 @@ def get_data_for_plotting(signal, start, end):
         End timestamp.
 
     """
-    x_data, y_data = signal.T
+    x_data, y_data = signal.index, signal.values
     start = np.abs(np.array(x_data) - start).argmin()
     end = np.abs(np.array(x_data) - end).argmin()
 
     return x_data, y_data, start, end
 
 
-def create_fake_can_data(start, stop,
-                         period=0.01,
-                         amplitude=1,
-                         offset=0,
-                         time_noise=0.05,
-                         signal_noise=0.02,
-                         signal_type="sin",
-                         verbose=True):
+def create_fake_can_time(start, stop, period, time_noise=0, verbose=False):
     """
-    Create fake CAN data for testing.
-
-    This function uses sane default values to make usage easier.
+    Create fake CAN time for testing.
 
     Parameters
     ----------
@@ -1108,13 +1131,50 @@ def create_fake_can_data(start, stop,
         End timestamp.
     period : float, optional
         Time period between signals. The default is 0.01.
+    time_noise : float, optional
+        Stanard deviation of the jitter of the time period between signals.
+        The default is 0.05.
+    """
+
+    if verbose:
+        if time_noise > 0.1:
+            print("Time noise is pretty large (Over 10% of period)")
+
+    steps = int((stop - start) / period)
+    time = np.linspace(start, stop, steps)
+
+    # adding noise to time
+    time += np.random.normal(scale=time_noise * period, size=len(time))
+
+    assert np.diff(time).min() > 0
+
+    return time
+
+
+def create_fake_can_data(
+        time,
+        kind,
+        amplitude=1,
+        offset=0,
+        signal_noise=0.02,
+        signal_type="sin",
+        verbose=True,
+    ):
+    """
+    Create fake CAN data for testing.
+
+    This function uses sane default values to make usage easier.
+
+    Parameters
+    ----------
+    time: np.array
+        Time signal.
+    kind: str
+        Kind of data to create. Can either be "float" or "categorical".
     amplitude : float, optional
         Amplitude of the value signal. The default is 1.
     offset : float, optional
         Offset of the value signal. The default is 0.
-    time_noise : float, optional
-        Stanard deviation of the jitter of the time period between signals.
-        The default is 0.05.
     signal_noise : float, optional
         Standard deviation of jitter of the value signals. The default is 0.02.
     signal_type : str, optional
@@ -1126,6 +1186,8 @@ def create_fake_can_data(start, stop,
     ------
     ValueError
         When a not supported signal_type is used.
+    ValueError
+        When a not supported signal kind is used.
 
     Returns
     -------
@@ -1134,37 +1196,28 @@ def create_fake_can_data(start, stop,
 
     """
     if verbose:
-        if time_noise > 0.1:
-            print("Time noise is pretty large (Over 10% of period)")
         if signal_noise > 0.05:
             print("Signal noise is pretty large (Over 5% of amplitude)")
 
-    steps = int((stop - start) / period)
-    time = np.linspace(start, stop, steps)
+    if kind == "float":
+        # create different signals
+        if signal_type == "sin":
+            signal = np.sin(time)
+        elif signal_type == "step":
+            signal = np.less(np.sin(time), 0.5)
+        else:
+            raise ValueError("The signal type '{}' is "
+                            "not supported.".format(signal_type))
 
-    # create different signals
-    if signal_type == "sin":
-        signal = np.sin(time)
-    elif signal_type == "step":
-        signal = np.less(np.sin(time), 0.5)
+        # adding offset and noise
+        signal += offset
+        signal += np.random.normal(scale=signal_noise * amplitude,
+                                size=len(signal))
+
+    elif kind == "categorical":
+        signal = np.random.choice([0, 1], size=len(time), p=[0.1, 0.9])
     else:
-        raise ValueError("The signal type '{}' is "
-                         "not supported.".format(signal_type))
+        raise ValueError("The signal kind '{}' is "
+                        "not supported.".format(kind))
 
-    # adding offset and noise
-    signal += offset
-    signal += np.random.normal(scale=signal_noise * amplitude,
-                               size=len(signal))
-
-    time += np.random.normal(scale=time_noise * period, size=len(time))
-
-    # check if time is steadily growing like in reality
-    for idx in range(len(time) - 1):
-        if time[idx] >= time[idx + 1]:
-            if verbose:
-                print("Time not steadily growing -> Fixing")
-            time[idx + 1] = time[idx] + time_noise * period * 0.1
-
-    data = np.array(tuple(zip(time, signal)))
-
-    return data
+    return signal
