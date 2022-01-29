@@ -728,7 +728,9 @@ def from_file(dbc_db, path, names=None, always_convert=False,
 
     """
     path = Path(path).with_suffix("")
-    if os.path.isfile(path.with_suffix(".mat")) and not always_convert:
+    if os.path.isdir(path) and not always_convert:
+        return from_parquet(dbc_db, path)
+    elif os.path.isfile(path.with_suffix(".mat")) and not always_convert:
         if verbose:
             print("Using already converted data")
         # add timer
@@ -762,6 +764,14 @@ def from_file(dbc_db, path, names=None, always_convert=False,
                 raise KeyError("Wrong name: ", name)
 
     return CANDataLog(ret_value, dbc_db, **kwargs)
+
+
+def from_parquet(dbc_db, path, **kwargs):
+    path = Path(path).with_suffix("")
+    log_data = dict()
+    for file_path in path.with_suffix("").glob("*.parquet"):
+        log_data[file_path.stem] = pd.read_parquet(file_path)
+    return CANDataLog(log_data, dbc_db, **kwargs)
 
 
 def from_fake(dbc_db, messages_properties, **kwargs):
