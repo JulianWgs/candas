@@ -33,8 +33,7 @@ class CANDataLog(dict):
     Beyond that other function are implemented.
     """
 
-    def __init__(self, log_data, dbc_db, file_hash_blf, file_hash_mat, source,
-                 metadata=None):
+    def __init__(self, log_data, dbc_db, metadata=None):
         """
         Parameters
         ----------
@@ -44,15 +43,6 @@ class CANDataLog(dict):
         dbc_db : cantools.db.Database
             The dbc database which was used to convert the data from a binary
             format.
-        file_hash_blf : str
-            The file hash of the original .blf file.
-        file_hash_mat : str
-            The file hash of the converted .mat file.
-            This is an unique identifiers.
-        source : str
-            The source from where this object was created.
-            It can be either from a file, database or from a fake data
-            generator.
 
         Returns
         -------
@@ -63,9 +53,6 @@ class CANDataLog(dict):
         self.__dbc_db = dbc_db
         if not metadata:
             metadata = dict()
-        metadata["file_hash_blf"] = file_hash_blf
-        metadata["file_hash_mat"] = file_hash_mat
-        metadata["source"] = source
         self.metadata = MetaData(metadata)
         self.__session_id = None
 
@@ -727,22 +714,6 @@ def from_file(dbc_db, path, names=None, always_convert=False,
         log_data = decode_data(log_data, dbc_db)
         savemat(path.with_suffix(".mat"), log_data)
 
-    # Hash file for the record
-    hasher = hashlib.sha256()
-    if os.path.isfile(path.with_suffix(".blf")):
-        with open(path.with_suffix(".blf"), "rb") as file:
-            buf = file.read()
-            hasher.update(buf)
-        file_hash_blf = hasher.hexdigest()
-    else:
-        # Give fake file hash
-        file_hash_blf = ("00000000000000000000000000000000"
-                         "00000000000000000000000000000000")
-    with open(path.with_suffix(".mat"), "rb") as file:
-        buf = file.read()
-        hasher.update(buf)
-    file_hash_mat = hasher.hexdigest()
-
     # return full data log
     if names is None:
         ret_value = log_data
@@ -755,16 +726,10 @@ def from_file(dbc_db, path, names=None, always_convert=False,
             except KeyError:
                 raise KeyError("Wrong name: ", name)
 
-    return CANDataLog(ret_value, dbc_db,
-                      file_hash_blf, file_hash_mat, source="file", **kwargs)
+    return CANDataLog(ret_value, dbc_db, **kwargs)
 
 
-def from_fake(dbc_db,
-              signals_properties,
-              file_hash_blf=("00000000000000000000000000000000"
-                             "00000000000000000000000000000000"),
-              file_hash_mat=("00000000000000000000000000000000"
-                             "00000000000000000000000000000000"), **kwargs):
+def from_fake(dbc_db, signals_properties, **kwargs):
     """
     Create a data log with propterties given in a list of dicts with key name
     arguments of create_fake_can_data function.
@@ -777,14 +742,6 @@ def from_fake(dbc_db,
     signals_properties : :obj:`dict`
         Key-Value pairs of the properties. See create_fake_can_data for more
         information.
-    file_hash_blf : str, optional
-        Fake hash of the .blf file.
-        The default is ("00000000000000000000000000000000"
-        "00000000000000000000000000000000").
-    file_hash_mat : str, optional
-        Fake hash of the .mat file.
-        The default is ("00000000000000000000000000000000"
-        "00000000000000000000000000000000").
 
     Returns
     -------
@@ -799,8 +756,7 @@ def from_fake(dbc_db,
         name = signal_properties.pop("name")
         log_data[name] = create_fake_can_data(**signal_properties)
 
-    return CANDataLog(log_data, dbc_db,
-                      file_hash_blf, file_hash_mat, source="fake", **kwargs)
+    return CANDataLog(log_data, dbc_db, **kwargs)
 
 
 def load_dbc(path, verbose=True):

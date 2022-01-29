@@ -31,14 +31,8 @@ class TestCANDataLog(unittest.TestCase):
         log_data = cd.from_fake(dbc_db, signals_properties,
                                 file_hash_blf, file_hash_mat)
         self.assertTrue(repr(log_data))
-        self.assertEqual(log_data.metadata["file_hash_blf"],
-                         file_hash_blf)
-        self.assertEqual(log_data.metadata["file_hash_mat"],
-                         file_hash_mat)
         self.assertEqual(log_data.dbc_db,
                          dbc_db)
-        self.assertEqual(log_data.metadata["source"],
-                         "fake")
         self.assertRaises(ValueError,
                           log_data.metadata.__setitem__, "source", "database")
         self.assertRaises(ValueError,
