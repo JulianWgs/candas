@@ -729,12 +729,13 @@ def from_file(dbc_db, path, names=None, always_convert=False,
     """
     path = Path(path).with_suffix("")
     if os.path.isdir(path) and not always_convert:
+        if verbose:
+            print("Loading from parquet...")
         return from_parquet(dbc_db, path)
     elif os.path.isfile(path.with_suffix(".mat")) and not always_convert:
         if verbose:
-            print("Using already converted data")
-        # add timer
-        log_data = loadmat(path.with_suffix(".mat"))
+            print("Loading from mat-file...")
+        return from_mat(dbc_db, path)
     else:
         log_data = can.BLFReader(path.with_suffix(".blf"))
         if verbose:
@@ -772,6 +773,29 @@ def from_parquet(dbc_db, path, **kwargs):
     for file_path in path.with_suffix("").glob("*.parquet"):
         log_data[file_path.stem] = pd.read_parquet(file_path)
     return CANDataLog(log_data, dbc_db, **kwargs)
+
+
+def from_mat(dbc_db, path, **kwargs):
+    path = Path(path)
+    signal_data = loadmat(path.with_suffix(".mat"))
+    dfs = dict()
+    for message in dbc_db.messages:
+        message_data = list()
+        signal_names = list()
+        try:
+            for signal in message.signals:
+                message_data.append(signal_data[signal.name][:, 1])
+                signal_names.append(signal.name)
+            dfs[message.name] = pd.DataFrame(
+                # For string dtypes the time values are objects
+                index=signal_data[signal.name][:, 0].astype(np.float64),
+                data=np.array(message_data).T,
+                columns=signal_names,
+            )
+        except KeyError:
+            pass
+
+    return CANDataLog(dfs, dbc_db, **kwargs)
 
 
 def from_fake(dbc_db, messages_properties, **kwargs):
