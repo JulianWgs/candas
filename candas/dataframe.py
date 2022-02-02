@@ -52,6 +52,7 @@ class CANDataLog():
 
         """
         self._log_data = log_data
+        self.messages = list(log_data.keys())
         self.__dbc_db = dbc_db
         if not metadata:
             metadata = dict()
