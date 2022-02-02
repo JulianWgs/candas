@@ -745,11 +745,9 @@ def from_file(dbc_db, path, names=None, always_convert=False,
             )
         log_data = decode_data(log_data, dbc_db)
         os.mkdir(path)
+        dtypes = get_dtypes(dbc_db)
         for message_name, df in log_data.items():
-            try:
-                df.to_parquet(path / (message_name + ".parquet"))
-            except ArrowInvalid:
-                print(message_name)
+            df.astype(dtypes[message_name]).to_parquet(path / (message_name + ".parquet"))
 
     # return full data log
     if names is None:
@@ -873,6 +871,34 @@ def load_dbc(path, verbose=True):
     if verbose:
         print("Finished loading.")
     return dbc_db
+
+def get_dtypes(dbc_db):
+    dtypes = defaultdict(dict)
+    for message in dbc_db.messages:
+        for signal in message.signals:
+            if signal.choices is not None:
+                dtypes_of_choices = tuple(set([type(value.value) for key, value in signal.choices.items()]))
+                if len(dtypes_of_choices) != 1:
+                    raise ValueError(f"Mixed dtypes in choices is not allowed ({message.name}, {signal.name})")
+                value = tuple(signal.choices.values())[0].value
+                if isinstance(value, str):
+                    dtype_of_choices = "string"
+                else:
+                    raise ValueError(f"Only string choices are supported ({message.name}, {signal.name})")
+            else:
+                dtype_of_choices = None
+            if dtype_of_choices == "string":
+                dtype = "string"
+            elif signal.length == 1:
+                dtype = "boolean"
+            elif isinstance(signal.scale, int) and isinstance(signal.offset, int):
+                dtype = "Int64"
+            elif isinstance(signal.scale, float) or isinstance(signal.offset, float):
+                dtype = "Float64"
+            else:
+                raise ValueError(f"Could not detect data type ({message.name}, {signal.name})")
+            dtypes[message.name][signal.name] = dtype
+    return dict(dtypes)
 
 
 def decode(dbc_db, message):
