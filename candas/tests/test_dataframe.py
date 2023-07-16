@@ -112,6 +112,85 @@ class TestCANDataLog(unittest.TestCase):
         self.assertEqual(log_data.metadata["event"], event)
         self.assertEqual(log_data.metadata["location"], location)
 
+def test_equality():
+    # Time and signal noise must be zero for both to be identical
+    dbc_db = cd.load_dbc(dbc_folder)
+    signals_properties = [{
+        "name": "AMS_Voltage_1_3",
+        "start": 2,
+        "period": 0.1,
+        "stop": 200,
+        "time_noise": 0,
+        "signals": [{
+            "kind": "float",
+            "name": "AMS_CellVoltage11",
+            "signal_noise": 0,
+        }]
+    }]
+    log_data = cd.from_fake(dbc_db, signals_properties)
+    assert log_data == log_data
+
+    signals_properties_other = [{
+        "name": "AMS_Voltage_1_3",
+        "start": 2,
+        "period": 0.1,
+        "stop": 200,
+        "time_noise": 0,
+        "signals": [{
+            "kind": "float",
+            "name": "AMS_CellVoltage11",
+            "signal_noise": 0,
+        }]
+    }]
+    log_data_other = cd.from_fake(dbc_db, signals_properties_other)
+    assert log_data == log_data_other
+
+    # DataFrame not identically labeled
+    signals_properties_different = [{
+        "name": "AMS_Voltage_1_3",
+        "start": 2,
+        "period": 0.2,
+        "stop": 200,
+        "signals": [{
+            "kind": "float",
+            "name": "AMS_CellVoltage11",
+        }]
+    }]
+    log_data_different = cd.from_fake(dbc_db, signals_properties_different)
+    assert log_data != log_data_different
+
+    # DataFrame identically labeled (no time noise)
+    signals_properties_different = [{
+        "name": "AMS_Voltage_1_3",
+        "start": 2,
+        "period": 0.1,
+        "stop": 200,
+        "time_noise": 0,
+        "signals": [{
+            "kind": "float",
+            "name": "AMS_CellVoltage11",
+            "amplitude": 10,
+            "offset": 0,
+        }]
+    }]
+    log_data_different = cd.from_fake(dbc_db, signals_properties_different)
+    assert log_data != log_data_different
+
+
+def test_io(tmp_path):
+    dbc_db = cd.load_dbc(dbc_folder)
+    log_data = cd.from_blf(dbc_db, DIR + "test_small.blf")
+
+    log_data.to_parquet(tmp_path / "test_small")
+    log_data.to_mat(tmp_path / "test_small.mat")
+
+    log_data_parquet = cd.from_parquet(dbc_db, tmp_path / "test_small")
+    log_data_mat = cd.from_mat(dbc_db, tmp_path / "test_small.mat")
+
+    assert log_data == log_data_parquet
+    assert log_data == log_data_mat
+    assert log_data_parquet == log_data_mat
+
 
 class TestLoadDBC(unittest.TestCase):
     """Test load_dbc."""

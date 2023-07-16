@@ -104,6 +104,18 @@ class CANDataLog():
         """
         return self.__dbc_db
 
+    def __eq__(self, other):
+        if isinstance(other, CANDataLog):
+            try:
+                return (
+                    (set(self.messages) == set(other.messages)) and
+                    all((self[message] == other[message]).all().all() for message in self.messages)
+                )
+            except ValueError:
+                # Can only compare identically-labeled DataFrame objects
+                return False
+        return False
+
     @property
     def session_id(self):
         """
@@ -694,6 +706,24 @@ class CANDataLog():
 
         return pd.DataFrame(stats_dict)
 
+    def to_parquet(self, path):
+        path = Path(path)
+        os.mkdir(path)
+        for message_name in self.messages:
+            self[message_name].to_parquet(path / (message_name + ".parquet"))
+
+    def to_mat(self, path):
+        path = Path(path)
+        signal_data = {}
+        for message_name in self.messages:
+            for signal_name in self[message_name].columns:
+                signal_data[signal_name] = np.array([
+                    self[message_name, signal_name].index,
+                    self[message_name, signal_name].values
+                ]).T
+
+        savemat(path, signal_data)
+
 
 def from_file(dbc_db, path, names=None, always_convert=False,
               verbose=True, **kwargs):
@@ -740,14 +770,14 @@ def from_file(dbc_db, path, names=None, always_convert=False,
     elif os.path.isfile(path.with_suffix(".mat")) and not always_convert:
         if verbose:
             print("Loading from mat-file...")
-        return from_mat(dbc_db, path)
+        return from_mat(dbc_db, path.with_suffix(".mat"))
     else:
         if verbose:
             print(
                 "Converting data to readable format... "
                 "this might take several minutes"
             )
-        return from_blf(dbc_db, path, names)
+        return from_blf(dbc_db, path.with_suffix(".blf"), names)
 
 
 def from_parquet(dbc_db, path, **kwargs):
@@ -782,7 +812,8 @@ def from_mat(dbc_db, path, **kwargs):
 
 
 def from_blf(dbc_db, path, names=None, **kwargs):
-    log_data = can.BLFReader(path.with_suffix(".blf"))
+    path = Path(path)
+    log_data = can.BLFReader(path)
     log_data = decode_data(log_data, dbc_db)
 
     if names is None:
