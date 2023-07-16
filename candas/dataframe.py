@@ -698,7 +698,11 @@ class CANDataLog():
 def from_file(dbc_db, path, names=None, always_convert=False,
               verbose=True, **kwargs):
     """
-    Create CANDataLog object from a .blf (raw binary) or .mat (converted) file.
+    Create CANDataLog object from a file, which can be a directory
+    with .parquet files, a .blf (raw binary) or .mat (converted) file.
+
+    If the data is already converted in the .parquet or mat .format,
+    it preferably loaded from those in that order.
 
     Parameters
     ----------
@@ -738,25 +742,12 @@ def from_file(dbc_db, path, names=None, always_convert=False,
             print("Loading from mat-file...")
         return from_mat(dbc_db, path)
     else:
-        log_data = can.BLFReader(path.with_suffix(".blf"))
         if verbose:
             print(
                 "Converting data to readable format... "
                 "this might take several minutes"
             )
-        log_data = decode_data(log_data, dbc_db)
-
-    # return full data log
-    if names is None:
-        ret_value = log_data
-    # return only given names
-    else:
-        ret_value = defaultdict(dict)
-        for name in names:
-            message_name, signal_name = name
-            ret_value[message_name][signal_name] = log_data[message_name][signal_name]
-
-    return CANDataLog(ret_value, dbc_db, **kwargs)
+        return from_blf(dbc_db, path, names)
 
 
 def from_parquet(dbc_db, path, **kwargs):
@@ -788,6 +779,21 @@ def from_mat(dbc_db, path, **kwargs):
             pass
 
     return CANDataLog(dfs, dbc_db, **kwargs)
+
+
+def from_blf(dbc_db, path, names=None, **kwargs):
+    log_data = can.BLFReader(path.with_suffix(".blf"))
+    log_data = decode_data(log_data, dbc_db)
+
+    if names is None:
+        ret_value = log_data
+    else:
+        ret_value = defaultdict(dict)
+        for name in names:
+            message_name, signal_name = name
+            ret_value[message_name][signal_name] = log_data[message_name][signal_name]
+
+    return CANDataLog(ret_value, dbc_db, **kwargs)
 
 
 def from_fake(dbc_db, messages_properties, **kwargs):
