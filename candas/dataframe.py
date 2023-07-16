@@ -745,23 +745,16 @@ def from_file(dbc_db, path, names=None, always_convert=False,
                 "this might take several minutes"
             )
         log_data = decode_data(log_data, dbc_db)
-        os.mkdir(path)
-        dtypes = get_dtypes(dbc_db)
-        for message_name, df in log_data.items():
-            df.astype(dtypes[message_name]).to_parquet(path / (message_name + ".parquet"))
 
     # return full data log
     if names is None:
         ret_value = log_data
     # return only given names
-    # TODO: Does not work
     else:
-        ret_value = {}
+        ret_value = defaultdict(dict)
         for name in names:
-            try:
-                ret_value[name] = log_data[name]
-            except KeyError:
-                raise KeyError("Wrong name: ", name)
+            message_name, signal_name = name
+            ret_value[message_name][signal_name] = log_data[message_name][signal_name]
 
     return CANDataLog(ret_value, dbc_db, **kwargs)
 
@@ -881,23 +874,25 @@ def get_dtypes(dbc_db):
                 dtypes_of_choices = tuple(set([type(value.value) for key, value in signal.choices.items()]))
                 if len(dtypes_of_choices) != 1:
                     raise ValueError(f"Mixed dtypes in choices is not allowed ({message.name}, {signal.name})")
-                value = tuple(signal.choices.values())[0].value
+                value = tuple(signal.choices.values())[0].name
                 if isinstance(value, str):
                     dtype_of_choices = "string"
                 else:
-                    raise ValueError(f"Only string choices are supported ({message.name}, {signal.name})")
+                    raise ValueError(f"Dtype {type(value)} for choices is not supported in message ({message.name}, {signal.name})")
             else:
                 dtype_of_choices = None
+
             if dtype_of_choices == "string":
                 dtype = "string"
-            elif signal.length == 1:
-                dtype = "boolean"
-            elif isinstance(signal.scale, int) and isinstance(signal.offset, int):
-                dtype = "Int64"
-            elif isinstance(signal.scale, float) or isinstance(signal.offset, float):
-                dtype = "Float64"
             else:
-                raise ValueError(f"Could not detect data type ({message.name}, {signal.name})")
+                if signal.length == 1:
+                    dtype = "boolean"
+                elif isinstance(signal.scale, int) and isinstance(signal.offset, int):
+                    dtype = "Int64"
+                elif isinstance(signal.scale, float) or isinstance(signal.offset, float):
+                    dtype = "Float64"
+                else:
+                    raise ValueError(f"Could not detect data type ({message.name}, {signal.name})")
             dtypes[message.name][signal.name] = dtype
     return dict(dtypes)
 
@@ -943,6 +938,10 @@ def decode_data(log, dbc_db):
         dfs[name] = pd.DataFrame(messages_grouped[name]).set_index("timestamp")
     if error_ids:
         print("The following IDs caused errors: " + str(error_ids))
+
+    dtypes = get_dtypes(dbc_db)
+    for message_name in dfs.keys():
+        dfs[message_name] = dfs[message_name].astype(dtypes[message_name])
     return dfs
 
 

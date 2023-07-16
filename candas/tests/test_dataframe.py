@@ -133,13 +133,16 @@ class TestCreateLogData(unittest.TestCase):
         dbc_db = cd.load_dbc(dbc_folder)
         filename = DIR + "test_small.blf"[:-4]
         self.assertEqual(
-            cd.from_file(dbc_db, filename)["AMS_Voltage_1_3"][0][0],
+            cd.from_file(dbc_db, filename)[("AMS_CellVoltage11", "AMS_Voltage_1_3")].index[0],
             1.674295)
         self.assertEqual(
-            cd.from_file(dbc_db, filename, names=["AMS_Voltage_1_3"])
-            ["AMS_Voltage_1_3"][0][0],
+            cd.from_file(dbc_db, filename, names=[("AMS_CellVoltage11", "AMS_Voltage_1_3")])
+            [("AMS_CellVoltage11", "AMS_Voltage_1_3")].index[0],
             1.674295)
+        # TODO: Add test case for when names is a message
         self.assertRaises(KeyError, cd.from_file, dbc_db,
+                          filename, names=[("dsfjk", "gsdfjh")])
+        self.assertRaises(ValueError, cd.from_file, dbc_db,
                           filename, names=["gsdfjh"])
 
 
