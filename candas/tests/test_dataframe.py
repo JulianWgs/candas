@@ -6,6 +6,8 @@ import pandas as pd
 import datetime
 import candas as cd
 import pytest
+import sqlite3
+import itertools
 from candas.dataframe import get_xy_from_timeseries, get_label_from_names
 
 
@@ -178,15 +180,20 @@ def test_io(tmp_path):
     dbc_db = cd.load_dbc(dbc_folder)
     log_data = cd.from_blf(dbc_db, DIR + "test_small.blf")
 
+    conn_write = sqlite3.connect(tmp_path / "test_small.sql")
+
     log_data.to_parquet(tmp_path / "test_small")
     log_data.to_mat(tmp_path / "test_small.mat")
+    log_data.to_sql(conn_write)
+
+    conn_read = sqlite3.connect(tmp_path / "test_small.sql")
 
     log_data_parquet = cd.from_parquet(dbc_db, tmp_path / "test_small")
     log_data_mat = cd.from_mat(dbc_db, tmp_path / "test_small.mat")
+    log_data_sql = cd.from_sql(dbc_db, conn_read, log_data.messages)
 
-    assert log_data == log_data_parquet
-    assert log_data == log_data_mat
-    assert log_data_parquet == log_data_mat
+    for left, right in itertools.combinations([log_data, log_data_parquet, log_data_mat, log_data_sql], 2):
+        assert left == right
 
 
 def test_load_dbc():

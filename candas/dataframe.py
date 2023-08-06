@@ -712,6 +712,10 @@ class CANDataLog():
         for message_name in self.messages:
             self[message_name].to_parquet(path / (message_name + ".parquet"))
 
+    def to_sql(self, conn):
+        for message_name in self.messages:
+            self[message_name].to_sql(message_name, conn)
+
     def to_mat(self, path):
         path = Path(path)
         signal_data = {}
@@ -785,6 +789,18 @@ def from_parquet(dbc_db, path, **kwargs):
     log_data = dict()
     for file_path in path.with_suffix("").glob("*.parquet"):
         log_data[file_path.stem] = pd.read_parquet(file_path)
+    return CANDataLog(log_data, dbc_db, **kwargs)
+
+
+def from_sql(dbc_db, conn, table_names, **kwargs):
+    log_data = dict()
+    for table_name in table_names:
+        # SQLite DBAPI connection mode not supported for read_sql_table
+        log_data[table_name] = pd.read_sql_query(
+            f"SELECT * FROM {table_name}",
+            conn,
+            index_col="timestamp",
+        )
     return CANDataLog(log_data, dbc_db, **kwargs)
 
 
