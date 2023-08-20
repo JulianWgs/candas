@@ -24,6 +24,8 @@ import pandas as pd
 import cantools
 import can
 from pyarrow import ArrowInvalid
+import scipy.interpolate
+from . config import _get_option, _set_option, _options
 from . metadata import MetaData
 
 
@@ -82,7 +84,7 @@ class CANDataLog():
             if isinstance(message, slice): 
                 assert self.signal_message_mapping is not None, "Signal names must be unique if ':' is passed as message name"
                 message = self.signal_message_mapping[signal]
-            return self._log_data[message][signal]
+            return CANSeries(self._log_data[message][signal])
         else:
             return self._log_data[key]
 
@@ -727,6 +729,42 @@ class CANDataLog():
                 ]).T
 
         savemat(path, signal_data)
+
+
+class CANSeries(pd.Series):
+    def __sub__(left, right):
+        on = _options["interpolation.on"]
+        how = _options["interpolation.how"]
+        if on is None or how is None:
+            raise ValueError
+        elif how == "linear" and on == "left":
+            right = pd.Series(
+                data=scipy.interpolate.interp1d(
+                    right.index,
+                    right.values,
+                    bounds_error=False,
+                    )(left.index),
+                index=left.index
+            )
+            return CANSeries(pd.Series(left) - right)
+        else:
+            raise NotImplementedError
+
+
+class Interpolation():
+    def __init__(self, **ops):
+        self.ops = {".".join(["interpolation", pat]): val for pat, val in ops.items()}
+
+    def __enter__(self):
+        self.undo = {pat: _get_option(pat) for pat in self.ops.keys()}
+
+        for pat, val in self.ops.items():
+            _set_option(pat, val)
+
+    def __exit__(self, *args):
+        if self.undo:
+            for pat, val in self.undo.items():
+                _set_option(pat, val)
 
 
 def from_file(dbc_db, path, names=None, always_convert=False,
